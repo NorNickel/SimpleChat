@@ -1,3 +1,5 @@
+package best.aog.chat.server;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
