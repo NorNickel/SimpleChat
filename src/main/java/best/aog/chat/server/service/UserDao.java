@@ -8,13 +8,13 @@ import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class UserDao implements UserService {
+
     private final static int NUMBER_OF_CONNECTIONS_START = 5;
     private final static String BSCRYPT_SALT = BCrypt.gensalt(10);
 
@@ -30,18 +30,10 @@ public class UserDao implements UserService {
     private Logger logger;
 
     private UserDao() {
-        //try {
         logger = Logger.getLogger(UserDao.class.getName());
         logger.log(Level.INFO, "Try to connect to DB: " + url);
-        connectionPool.createConnectionPool(); //???!!!
+        connectionPool.createConnectionPool();
         logger.log(Level.INFO, "Connected to DB: " + url);
-            /*
-        } catch (SQLException e) {
-            e.printStackTrace();
-            logger.log(Level.WARNING, "Cannot connect to DB", e);
-            //???!!!
-             */
-        //}
     }
 
     public static UserDao getInstance() {
@@ -58,9 +50,8 @@ public class UserDao implements UserService {
     @Override
     public synchronized boolean addUser(User user) {
         boolean result = false;
-        try {
+        try (Connection connection = connectionPool.get()) {
             String insert = "INSERT INTO chatdb.user (login, hashPassword) VALUES (?, ?)";
-            Connection connection = connectionPool.get();
             PreparedStatement preparedInsert = connection.prepareStatement(insert);
             preparedInsert.setString(1, user.getLogin());
             String hashPassword = BCrypt.hashpw(user.getPassword(), BSCRYPT_SALT);
@@ -81,9 +72,9 @@ public class UserDao implements UserService {
     @Override
     public User getUserByLogin(String login) {
         User user = null;
+        Connection connection = connectionPool.get();
         try {
             String select = "SELECT login, hashPassword FROM chatdb.user WHERE login = ?";
-            Connection connection = connectionPool.get();
             PreparedStatement preparedSelect = connection.prepareStatement(select);
             preparedSelect.setString(1, login);
             ResultSet rs = preparedSelect.executeQuery();
@@ -94,6 +85,8 @@ public class UserDao implements UserService {
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            connectionPool.put(connection);
         }
         return user;
     }
@@ -101,13 +94,13 @@ public class UserDao implements UserService {
     @Override
     public List<Message> getMessages() {
         List<Message> result = new ArrayList<>();
-        Connection connection = connectionPool.get();
         String select =
                 "SELECT user.login, message.text " +
                 "FROM user, message " +
                 "WHERE user.userId = message.senderUserId " +
                 "ORDER BY date, time DESC " +
                 "LIMIT 10";
+        Connection connection = connectionPool.get();
         try {
             PreparedStatement preparedSelect = connection.prepareStatement(select);
             ResultSet resultSet = preparedSelect.executeQuery();
@@ -116,24 +109,25 @@ public class UserDao implements UserService {
                 String login = resultSet.getString(1);
                 User newUser = new User(login, "");
                 String text = resultSet.getString(2);
-                RegularMessageBody regBody = new RegularMessageBody(newUser, text, null);
+                RegularMessageBody regBody = new RegularMessageBody(newUser, text);
                 result.add(new Message(MessageType.REGULAR_MESSAGE, regBody));
             }
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            connectionPool.put(connection);
         }
         Collections.reverse(result);
         return result;
     }
 
     @Override
-    public boolean saveMessage(Message message) {
+    public void saveMessage(Message message) {
+        Connection connection = connectionPool.get();
         try {
             String update = "INSERT INTO chatdb.message" +
                     "(date, time, senderUserId, isForAll, text)" +
                     " VALUES (?, ?, (SELECT userId FROM chatdb.user WHERE login = ?), ?, ?)";
-
-            Connection connection = connectionPool.get();
             PreparedStatement preparedUpdate = connection.prepareStatement(update);
 
             java.util.Date now = new java.util.Date();
@@ -144,24 +138,22 @@ public class UserDao implements UserService {
             preparedUpdate.setString(3, messageBody.getUser().getLogin()); //???!!!
             preparedUpdate.setString(5, messageBody.getMessage());
             preparedUpdate.setBoolean(4, true);
+
             preparedUpdate.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
+        } finally {
+            connectionPool.put(connection);
         }
-        return false;
     }
 
     @Override
     public boolean validateUser(User user) {
-        boolean result = false;
         User foundUser = getUserByLogin(user.getLogin());
         if (foundUser == null) {
-            //???!!!
             return false;
         }
         return BCrypt.checkpw(user.getPassword(), foundUser.getPassword());
-        //???!!! у User обычный логин, из базы уже кешированный
     }
-
 
 }

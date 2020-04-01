@@ -11,5 +11,5 @@ public interface UserService {
     boolean validateUser(User user);
     User getUserByLogin(String login);
     List<Message> getMessages();
-    boolean saveMessage(Message message);
+    void saveMessage(Message message);
 }

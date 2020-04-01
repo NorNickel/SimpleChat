@@ -48,7 +48,7 @@ public class ConnectionPool {
         }
     }
 
-    public void put(Connection connection) {
+    public synchronized void put(Connection connection) {
         usedConnections.remove(connection);
         connections.add(connection);
     }
