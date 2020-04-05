@@ -5,13 +5,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.io.Serializable;
-
 @NoArgsConstructor
 @AllArgsConstructor
 @Setter
 @Getter
 public class User {
-    private String login;
+    private String userName;
     private String password;
+
+    @Override
+    public String toString() {
+        return userName;
+    }
 }

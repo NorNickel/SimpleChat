@@ -1,23 +1,23 @@
-package best.aog.chat.server.controller;
+package best.aog.chat.server.net;
 
-import best.aog.chat.server.model.Observer;
-import best.aog.chat.server.model.messages.Message;
+import best.aog.chat.server.messages.Message;
 import com.google.gson.Gson;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 
-public class TCPConnection implements Observer {
+public class TCPConnection implements Closeable {
 
+    private String userName = null;
     private Socket socket;
     private Thread receiveThread;
     private TCPConnectionListener eventListener;
+
     private BufferedReader in;
     private PrintWriter out;
-    private String login;
+
+
+    private static Gson gson = new Gson();
 
     public TCPConnection(TCPConnectionListener eventListener, String host, int port) throws IOException {
         this(eventListener, new Socket(host, port));
@@ -50,16 +50,16 @@ public class TCPConnection implements Observer {
         }
     }
 
-    public void setLogin(String login) {
-        this.login = login;
+    public String getUserName() {
+        return userName;
     }
 
-    public String getLogin() {
-        return login;
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 
-    public synchronized void sendMessage(String message) {
-        out.println(message);
+    public synchronized void sendMessage(Message message) {
+        out.println(gson.toJson(message));
         out.flush();
     }
 
@@ -73,13 +73,18 @@ public class TCPConnection implements Observer {
     }
 
     @Override
-    public void notifyObserver(Message message) {
-        Gson gson = new Gson();
-        sendMessage(gson.toJson(message));
-    }
-
-    @Override
     public String toString() {
         return socket.getInetAddress() + ": " + socket.getPort();
     }
-} //???!!!
+
+    @Override
+    public void close() throws IOException {
+        in.close();
+        out.close();
+        socket.close();
+    }
+
+    public void authorize(String userName) {
+        eventListener.onAuthorizationAccepted(this, userName);
+    }
+}

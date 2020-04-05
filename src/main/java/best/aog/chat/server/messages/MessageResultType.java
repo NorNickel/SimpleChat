@@ -1,4 +1,4 @@
-package best.aog.chat.server.model.messages;
+package best.aog.chat.server.messages;
 
 public enum MessageResultType {
     ACCEPT, DECLINE, ERROR;

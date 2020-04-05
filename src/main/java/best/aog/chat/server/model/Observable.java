@@ -1,11 +1,10 @@
 package best.aog.chat.server.model;
 
-import best.aog.chat.server.model.messages.Message;
+import best.aog.chat.server.messages.Message;
 
-import java.util.List;
 
 public interface Observable {
-    void addObserver(Observer o);
-    void stopObserver(Observer o);
+    void addObserver(String userName, Observer o);
+    void stopObserver(String userName);
     void notifyObservers(Message message);
 }

@@ -1,9 +1,9 @@
-package best.aog.chat.server.service;
+package best.aog.chat.server.dao;
 
+import best.aog.chat.server.messages.Message;
+import best.aog.chat.server.messages.MessageType;
+import best.aog.chat.server.messages.RegularMessageBody;
 import best.aog.chat.server.model.User;
-import best.aog.chat.server.model.messages.Message;
-import best.aog.chat.server.model.messages.MessageType;
-import best.aog.chat.server.model.messages.client.RegularMessageBody;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.*;
@@ -13,9 +13,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class UserDao implements UserService {
+public class DAOMySQL implements DAO {
 
-    private final static int NUMBER_OF_CONNECTIONS_START = 5;
     private final static String BSCRYPT_SALT = BCrypt.gensalt(10);
 
     // JDBC URL, username and password of MySQL server
@@ -23,24 +22,24 @@ public class UserDao implements UserService {
     private static final String user = "root";
     private static final String password = "12345";
 
-    private static volatile UserDao instance;
+    private static volatile DAOMySQL instance;
 
     private ConnectionPool connectionPool = new ConnectionPool();
 
     private Logger logger;
 
-    private UserDao() {
-        logger = Logger.getLogger(UserDao.class.getName());
+    private DAOMySQL() {
+        logger = Logger.getLogger(DAOMySQL.class.getName());
         logger.log(Level.INFO, "Try to connect to DB: " + url);
         connectionPool.createConnectionPool();
         logger.log(Level.INFO, "Connected to DB: " + url);
     }
 
-    public static UserDao getInstance() {
+    public static DAOMySQL getInstance() {
         if (instance == null) {
-            synchronized (UserDao.class) {
+            synchronized (DAOMySQL.class) {
                 if (instance == null) {
-                    instance = new UserDao();
+                    instance = new DAOMySQL();
                 }
             }
         }
@@ -48,12 +47,12 @@ public class UserDao implements UserService {
     }
 
     @Override
-    public synchronized boolean addUser(User user) {
+    public synchronized boolean saveUser(User user) {
         boolean result = false;
         try (Connection connection = connectionPool.get()) {
-            String insert = "INSERT INTO chatdb.user (login, hashPassword) VALUES (?, ?)";
+            String insert = "INSERT INTO chatdb.user (userName, hashPassword) VALUES (?, ?)";
             PreparedStatement preparedInsert = connection.prepareStatement(insert);
-            preparedInsert.setString(1, user.getLogin());
+            preparedInsert.setString(1, user.getUserName());
             String hashPassword = BCrypt.hashpw(user.getPassword(), BSCRYPT_SALT);
             preparedInsert.setString(2, hashPassword);
             int count = preparedInsert.executeUpdate();
@@ -65,22 +64,17 @@ public class UserDao implements UserService {
     }
 
     @Override
-    public synchronized boolean removeUser(User user) {
-        return false;
-    }
-
-    @Override
-    public User getUserByLogin(String login) {
+    public User getUserByUserName(String userName) {
         User user = null;
         Connection connection = connectionPool.get();
         try {
-            String select = "SELECT login, hashPassword FROM chatdb.user WHERE login = ?";
+            String select = "SELECT userName, hashPassword FROM chatdb.user WHERE userName = ?";
             PreparedStatement preparedSelect = connection.prepareStatement(select);
-            preparedSelect.setString(1, login);
+            preparedSelect.setString(1, userName);
             ResultSet rs = preparedSelect.executeQuery();
             while (rs.next()) {
                 user = new User();
-                user.setLogin(rs.getString(1));
+                user.setUserName(rs.getString(1));
                 user.setPassword(rs.getString(2));
             }
         } catch (SQLException e) {
@@ -95,22 +89,21 @@ public class UserDao implements UserService {
     public List<Message> getMessages() {
         List<Message> result = new ArrayList<>();
         String select =
-                "SELECT user.login, message.text " +
+                "SELECT user.userName, message.text " +
                 "FROM user, message " +
                 "WHERE user.userId = message.senderUserId " +
-                "ORDER BY date, time DESC " +
-                "LIMIT 10";
+                "ORDER BY date DESC, time DESC " +
+                "LIMIT 15";
         Connection connection = connectionPool.get();
         try {
             PreparedStatement preparedSelect = connection.prepareStatement(select);
             ResultSet resultSet = preparedSelect.executeQuery();
             while (resultSet.next()) {
                 //???!!! create messages
-                String login = resultSet.getString(1);
-                User newUser = new User(login, "");
+                String userName = resultSet.getString(1);
                 String text = resultSet.getString(2);
-                RegularMessageBody regBody = new RegularMessageBody(newUser, text);
-                result.add(new Message(MessageType.REGULAR_MESSAGE, regBody));
+                RegularMessageBody regBody = new RegularMessageBody(userName, text);
+                result.add(new Message(MessageType.REGULAR, regBody));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -127,15 +120,15 @@ public class UserDao implements UserService {
         try {
             String update = "INSERT INTO chatdb.message" +
                     "(date, time, senderUserId, isForAll, text)" +
-                    " VALUES (?, ?, (SELECT userId FROM chatdb.user WHERE login = ?), ?, ?)";
+                    " VALUES (?, ?, (SELECT userId FROM chatdb.user WHERE userName = ?), ?, ?)";
             PreparedStatement preparedUpdate = connection.prepareStatement(update);
 
             java.util.Date now = new java.util.Date();
             preparedUpdate.setDate(1, new java.sql.Date(now.getTime()));
             preparedUpdate.setTime(2, new java.sql.Time(now.getTime()));
 
-            RegularMessageBody messageBody = (RegularMessageBody) message.getMessageBody(); //???!!!
-            preparedUpdate.setString(3, messageBody.getUser().getLogin()); //???!!!
+            RegularMessageBody messageBody = (RegularMessageBody) message.getBody(); //???!!!
+            preparedUpdate.setString(3, messageBody.getUserName()); //???!!!
             preparedUpdate.setString(5, messageBody.getMessage());
             preparedUpdate.setBoolean(4, true);
 
@@ -148,12 +141,12 @@ public class UserDao implements UserService {
     }
 
     @Override
-    public boolean validateUser(User user) {
-        User foundUser = getUserByLogin(user.getLogin());
+    public boolean validateUser(String userName, String password) {
+        User foundUser = getUserByUserName(userName);
         if (foundUser == null) {
             return false;
         }
-        return BCrypt.checkpw(user.getPassword(), foundUser.getPassword());
+        return BCrypt.checkpw(password, foundUser.getPassword());
     }
 
 }

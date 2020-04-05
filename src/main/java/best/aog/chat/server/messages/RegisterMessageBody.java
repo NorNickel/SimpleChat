@@ -1,12 +1,9 @@
-package best.aog.chat.server.model.messages.client;
+package best.aog.chat.server.messages;
 
 import best.aog.chat.server.model.User;
-import best.aog.chat.server.model.messages.MessageBody;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
-@NoArgsConstructor
 @AllArgsConstructor
 @Getter
 public class RegisterMessageBody extends MessageBody {

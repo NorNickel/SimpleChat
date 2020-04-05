@@ -1,4 +1,4 @@
-package best.aog.chat.server.service;
+package best.aog.chat.server.dao;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
